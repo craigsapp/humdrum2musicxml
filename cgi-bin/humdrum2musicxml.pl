@@ -21,7 +21,7 @@ my $cgi_form = new CGI;
 # Configuration variables:
 my $basedir      = "/project/humdrum2musicxml";
 my $cachedir     = "$basedir/cache";
-my $maxsize      = 500000;                  # largest file size to allow
+my $maxsize      = 1000000;  # largest file size to allow
 
 # Command-line tools:
 my $humdrum2musicxml = "/usr/bin/python3 $basedir/converter21/convertscore.py -t musicxml";
