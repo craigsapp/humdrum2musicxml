@@ -1,0 +1,213 @@
+#!/usr/bin/perl
+#
+# Programmer:    Craig Stuart Sapp <craig.stanford.edu>
+# Creation Date: Wed Sep 15 07:37:50 PDT 2021
+# Last Modified: Wed 15 Sep 2021 04:04:40 PM PDT
+# Filename:      simplifyMusicxmlDurations
+# Syntax:        perl 5
+#
+# Description:   Reduce durations in MusicXML files to LCM values.
+#
+
+use strict;
+use Getopt::Long;
+
+my $countQ   = 0;
+my $factorQ  = 0;
+my $reducedQ = 0;
+Getopt::Long::Configure("bundling");
+GetOptions (
+   'c|count' => \$countQ,
+   'f|factor' => \$factorQ,
+   'r|reduced|reduced-count' => \$reducedQ
+);
+
+my $Quarter = 0;
+
+my @Contents = <>;
+chomp @Contents;
+
+initialCleaning();
+
+my %durations = getDurations();
+
+if ($countQ) {
+	foreach my $key (sort {$b <=> $a} keys %durations) {
+		print "$key\t$durations{$key}\n";
+	}
+	exit(0);
+}
+
+my $factor = multigcf(keys %durations);
+
+if ($factorQ) {
+	print "$factor\n";
+	exit(0);
+}
+
+if ($reducedQ) {
+	foreach my $key (sort {$b <=> $a} keys %durations) {
+		my $value = $key / $factor;
+		if ($key == $Quarter) {
+			print "$key*\t$value*\t$durations{$key}\n";
+		} else {
+			print "$key\t$value\t$durations{$key}\n";
+		}
+	}
+	exit(0);
+}
+
+if ($factor > 1) {
+	reduceDurations($factor);
+}
+
+foreach my $line (@Contents) {
+	next if $line =~ /^\s*$/;
+	print $line, "\n";
+}
+
+
+
+###########################################################################
+
+
+##############################
+##
+## initialCleaning --
+##
+
+sub initialCleaning {
+	my %PARTS;
+	my $counter = 0;
+	my @icounts;
+
+	for (my $i=0; $i<@Contents; $i++) {
+		my $line = $Contents[$i];
+		if ($line =~ /<software>/) {
+			$Contents[$i] = "";
+			next;
+		}
+		if ($line =~ /<creator\s+.*?type=['"]composer['"][^>]*>/) {
+			$line =~ s/Music\s*21//i;
+			$Contents[$i] = $line;
+			next;
+		}
+		if ($line =~ /<movement-title[^>]*>/) {
+			$line =~ s/\s*Music\s*21\s*Fragment\s*//i;
+			$Contents[$i] = $line;
+			next;
+		}
+		if ($line =~ /<score-part\s+.*id=['"]([^"]+)['"]/) {
+			my $oldid = $1;
+			$counter++;
+			my $newid = "P$counter";
+			$PARTS{$oldid} = $newid;
+			$line =~ s/$oldid/$newid/g;
+			$Contents[$i] = $line;
+			next;
+		}
+		if ($line =~ /<score-instrument\s+.*id=['"]([^"]+)['"]/) {
+			my $oldid = $1;
+			$icounts[$counter]++;
+			my $icounter = $icounts[$counter];
+			my $newid = "P$counter-I$icounter";
+			if ($newid !~ /^\s*$/) {
+				$line =~ s/$oldid/$newid/g;
+				$Contents[$i] = $line;
+				next;
+			}
+		}
+		if ($line =~ /<part\s+id=['"](.+?)['"]/) {
+			my $oldid = $1;
+			my $newid = $PARTS{$oldid};
+			if ($newid !~ /^\s*$/) {
+				$line =~ s/$oldid/$newid/g;
+				$Contents[$i] = $line;
+				next;
+			}
+		}
+	}
+}
+
+
+
+##############################
+##
+## reduceDurations --
+##
+
+sub reduceDurations {
+	my ($factor) = @_;
+	my $duration;
+	my $newduration;
+	for (my $i=0; $i<@Contents; $i++) {
+		my $line = $Contents[$i];
+		if ($line =~ /<duration[^>]*>\s*(\d+)\s*<\/duration>/) {
+			$duration = $1;
+			$newduration = $duration / $factor;
+			$line =~ s/$duration/$newduration/;
+			$Contents[$i] = $line;
+		} elsif ($line =~ /<divisions[^>]*>\s*(\d+)\s*<\/divisions>/) {
+			$duration = $1;
+			$newduration = $duration / $factor;
+			$line =~ s/$duration/$newduration/;
+			$Contents[$i] = $line;
+		}
+	}
+}
+
+
+
+##############################
+##
+## getDurations --
+##
+
+sub getDurations {
+	my %output;
+	my $duration;
+	for (my $i=0; $i<@Contents; $i++) {
+		my $line = $Contents[$i];
+		if ($line =~ /<duration[^>]*>\s*(\d+)\s*<\/duration>/) {
+			$duration = $1;
+			$output{$duration}++ if $duration > 0;
+		} elsif ($line =~ /<divisions[^>]*>\s*(\d+)\s*<\/divisions>/) {
+			$duration = $1;
+			$Quarter = $duration;
+			$output{$duration}++ if $duration > 0;
+		}
+	}
+	return %output;
+}
+
+
+
+##############################
+##
+## GCF and LCM functions:
+##
+
+sub gcf {
+  my ($x, $y) = @_;
+  ($x, $y) = ($y, $x % $y) while $y;
+  return $x;
+}
+
+sub lcm {
+  return($_[0] * $_[1] / gcf($_[0], $_[1]));
+}
+
+sub multigcf {
+  my $x = shift;
+  $x = gcf($x, shift) while @_;
+  return $x;
+}
+
+sub multilcm {
+  my $x = shift;
+  $x = lcm($x, shift) while @_;
+  return $x;
+}
+
+
+
