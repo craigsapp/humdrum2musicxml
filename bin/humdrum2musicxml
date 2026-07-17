@@ -19,7 +19,6 @@
 use strict;
 use HTTP::Request::Common;
 use LWP::UserAgent;
-#use LWP::ConsoleLogger::Easy qw( debug_ua );
 
 my $data;
 my $line;
@@ -27,22 +26,63 @@ while ($line = <>) {
    $data .= "$line";
 }
 
+# --- FIX 1: Point directly to the script or ensure protocol matches ---
 my $url = "http://musicxml.humdrum.org";
+
 my $ua = LWP::UserAgent->new();
-#debug_ua( $ua );
-my $request = POST($url, ['inputdata', [$data]]);
-my $content = $ua->request($request)->as_string();
-my @lines = split(/\n/, $content);
-my $emptyline = 0;
-for (my $i=0; $i<@lines; $i++) {
-	$line = $lines[$i];
-	if (($line eq "") && !$emptyline ) {
-		$emptyline = 1;
-		next;
-	}
-	next if !$emptyline;
-	print "$line\n";
+
+# --- FIX 2: Allow LWP to automatically follow redirect codes ---
+$ua->requests_redirectable(['GET', 'HEAD', 'POST']);
+
+# --- FIX 3: Correct multipart packaging for an in-memory scalar variable ---
+# By passing a scalar reference (\$data) and a dummy filename ('input.krn'),
+# HTTP::Request::Common packages it exactly as an uploaded browser file.
+my $request = POST($url,
+   Content_Type => 'form-data',
+   Content      => [
+      inputdata => [ undef, 'input.krn', Content => $data ]
+   ]
+);
+
+# Execute request and isolate the plain message payload context
+my $response = $ua->request($request);
+
+if ($response->is_success) {
+   # Print out the raw MusicXML returned from converter21
+   print $response->decoded_content;
+} else {
+   # Output diagnostic error feedback if the pipeline breaks
+   die "HTTP Error: " . $response->status_line . "\n" . $response->decoded_content . "\n";
 }
+
+
+#use strict;
+#use HTTP::Request::Common;
+#use LWP::UserAgent;
+##use LWP::ConsoleLogger::Easy qw( debug_ua );
+#
+#my $data;
+#my $line;
+#while ($line = <>) {
+#   $data .= "$line";
+#}
+#
+#my $url = "https://musicxml.humdrum.org";
+#my $ua = LWP::UserAgent->new();
+##debug_ua( $ua );
+#my $request = POST($url, ['inputdata', [$data]]);
+#my $content = $ua->request($request)->as_string();
+#my @lines = split(/\n/, $content);
+#my $emptyline = 0;
+#for (my $i=0; $i<@lines; $i++) {
+#	$line = $lines[$i];
+#	if (($line eq "") && !$emptyline ) {
+#		$emptyline = 1;
+#		next;
+#	}
+#	next if !$emptyline;
+#	print "$line\n";
+#}
 
 
 

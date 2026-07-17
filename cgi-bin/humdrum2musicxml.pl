@@ -35,7 +35,7 @@ my $cleanMusicxml    = "$basedir/bin/cleanMusicxml";
 my %OPTIONS;
 my $File = $cgi_form->param('inputdata');
 my $inputdata = "";
-my $Buffer;
+my $Buffer = "";
 while (read ($File, $Buffer, 1024)) {
 	$inputdata .= $Buffer;
 }
