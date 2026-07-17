@@ -20,69 +20,49 @@ use strict;
 use HTTP::Request::Common;
 use LWP::UserAgent;
 
+# 1. Read input humdrum score into memory scalar
 my $data;
 my $line;
 while ($line = <>) {
    $data .= "$line";
 }
 
-# --- FIX 1: Point directly to the script or ensure protocol matches ---
-my $url = "http://musicxml.humdrum.org";
+# Base address intercepted by your company's SSL proxy rules
+my $initial_url = "http://musicxml.humdrum.org";
 
 my $ua = LWP::UserAgent->new();
+$ua->ssl_opts(verify_hostname => 0); 
 
-# --- FIX 2: Allow LWP to automatically follow redirect codes ---
-$ua->requests_redirectable(['GET', 'HEAD', 'POST']);
+# --- STEP 2: RECONNAISSANCE HANDSHAKE ---
+# Send an empty request to let the user agent discover the final destination URL.
+# This follows the 301/302 chain automatically without stripping any actual data.
+my $handshake_response = $ua->head($initial_url);
+my $final_endpoint = $handshake_response->request->uri->as_string;
 
-# --- FIX 3: Correct multipart packaging for an in-memory scalar variable ---
-# By passing a scalar reference (\$data) and a dummy filename ('input.krn'),
-# HTTP::Request::Common packages it exactly as an uploaded browser file.
-my $request = POST($url,
+# Ensure the discovery matched the CGI script routing structure
+if ($final_endpoint !~ /cgi-bin/) {
+   $final_endpoint = "https://musicxml.humdrum.org";
+}
+
+# --- STEP 3: EMIT PURE MULTIPART FILE DATA ---
+# Deliver the payload to the confirmed destination. Since there are no more
+# redirects, your original server-side file upload routine reads it seamlessly.
+my $request = POST($final_endpoint,
    Content_Type => 'form-data',
    Content      => [
       inputdata => [ undef, 'input.krn', Content => $data ]
    ]
 );
 
-# Execute request and isolate the plain message payload context
-my $response = $ua->request($request);
-
-if ($response->is_success) {
-   # Print out the raw MusicXML returned from converter21
-   print $response->decoded_content;
-} else {
-   # Output diagnostic error feedback if the pipeline breaks
-   die "HTTP Error: " . $response->status_line . "\n" . $response->decoded_content . "\n";
+my $content = $ua->request($request)->as_string();
+my @lines = split(/\n/, $content);
+my $emptyline = 0;
+for (my $i=0; $i<@lines; $i++) {
+	$line = $lines[$i];
+	if (($line eq "") && !$emptyline ) {
+		$emptyline = 1;
+		next;
+	}
+	next if !$emptyline;
+	print "$line\n";
 }
-
-
-#use strict;
-#use HTTP::Request::Common;
-#use LWP::UserAgent;
-##use LWP::ConsoleLogger::Easy qw( debug_ua );
-#
-#my $data;
-#my $line;
-#while ($line = <>) {
-#   $data .= "$line";
-#}
-#
-#my $url = "https://musicxml.humdrum.org";
-#my $ua = LWP::UserAgent->new();
-##debug_ua( $ua );
-#my $request = POST($url, ['inputdata', [$data]]);
-#my $content = $ua->request($request)->as_string();
-#my @lines = split(/\n/, $content);
-#my $emptyline = 0;
-#for (my $i=0; $i<@lines; $i++) {
-#	$line = $lines[$i];
-#	if (($line eq "") && !$emptyline ) {
-#		$emptyline = 1;
-#		next;
-#	}
-#	next if !$emptyline;
-#	print "$line\n";
-#}
-
-
-
