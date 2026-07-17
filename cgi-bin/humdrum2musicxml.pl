@@ -72,8 +72,8 @@ sub convertToMusicxml {
 	}
 
 	# Define the system shell tool chain
-#	my $command = "$humdrum2musicxml | $cleanMusicxml";
-	my $command = "$humdrum2musicxml ";
+	my $command = "$humdrum2musicxml | $cleanMusicxml";
+#	my $command = "$humdrum2musicxml ";
 	print STDERR "COMMAND RUNNING: $command\n";
 
 	my $outputdata = "";

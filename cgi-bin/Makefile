@@ -22,11 +22,17 @@ all:
 	cp humdrum2musicxml.pl  $(CGIBIN)/humdrum2musicxml
 	chmod 0755   $(CGIBIN)/humdrum2musicxml
 	
-	# 3. Add the permanent SELinux context rule for this file destination
+	# Add the permanent SELinux context rule for this file destination
 	sudo semanage fcontext -a -t httpd_sys_script_exec_t "$(CGIBIN)/humdrum2musicxml"
 	
-	# 4. Force the filesystem to instantly apply the newly defined context
+	# Force the filesystem to instantly apply the newly defined context
 	sudo restorecon -v $(CGIBIN)/humdrum2musicxml
+	
+	# Register the binary path permanently into SELinux as a web-executable script
+	sudo semanage fcontext -a -t httpd_sys_script_exec_t "/project/humdrum2musicxml/bin/cleanMusicxml"
+	
+	# Instantly apply the context label changes to the disk filesystem
+	sudo restorecon -v /project/humdrum2musicxml/bin/cleanMusicxml
 #                                                                         #
 #                                                                         #
 ###########################################################################
