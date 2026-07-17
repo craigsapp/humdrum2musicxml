@@ -27,7 +27,7 @@ while ($line = <>) {
    $data .= "$line";
 }
 
-my $url = "https://data.musicxml.humdrum.org";
+my $url = "http://musicxml.humdrum.org";
 my $ua = LWP::UserAgent->new();
 #debug_ua( $ua );
 my $request = POST($url, ['inputdata', [$data]]);

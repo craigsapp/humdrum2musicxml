@@ -16,6 +16,7 @@
 use strict;
 use CGI;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
+use IPC::Open2; 
 my $cgi_form = new CGI;
 
 # Configuration variables:
@@ -24,7 +25,7 @@ my $cachedir     = "$basedir/cache";
 my $maxsize      = 1000000;  # largest file size to allow
 
 # Command-line tools:
-my $humdrum2musicxml = "/usr/bin/python3 $basedir/converter21/convertscore.py -t musicxml";
+my $humdrum2musicxml = "/usr/bin/python3 -m converter21 -f humdrum -t musicxml - -";
 my $cleanMusicxml    = "$basedir/bin/cleanMusicxml";
 
 ##########################################################################
@@ -64,37 +65,42 @@ exit(0);
 ##
 
 sub convertToMusicxml {
+
 	my ($inputdata) = @_;
 
-	my $humdrumname = "";
-	if ($ENV{'CONTENT_LENGTH'} > $maxsize) {
-		errorMessage("Input data is too large");
-		return;
-	} else {
-		$humdrumname = cacheFile($inputdata);
-	}
-	if ($humdrumname =~ /^\s*$/) {
-		errorMessage("Error processing data");
-		exit(0);
-	}
-	my $xmlname = $humdrumname;
-	$xmlname =~ s/\.[^.]+$/.xml/;
-	if ($xmlname eq $humdrumname) {
-		errorMessage("Strange problem with data");
+	# ... keep your original content validation & caching code here ...
+
+	my $command = "$humdrum2musicxml | $cleanMusicxml";
+	print STDERR "COMMAND $command\n";
+
+	my $outputdata = "";
+
+	# Open bidirectional filehandles ($reader reads output, $writer sends input)
+	eval {
+		my ($reader, $writer);
+		my $pid = open2($reader, $writer, $command);
+
+		# 1. Pump the Humdrum raw text into the commands
+		print $writer $inputdata;
+		close($writer); # Close the writer so the shell knows no more input is coming
+
+		# 2. Extract the converted MusicXML text back from the command chain
+		while (my $line = <$reader>) {
+			$outputdata .= $line;
+		}
+		close($reader);
+
+		# 3. Clean up the system process record
+		waitpid($pid, 0);
+	};
+
+	# If open2 crashes (e.g. backend binaries missing), trap the error cleanly
+	if ($@) {
+		errorMessage("Backend pipeline execution failed: $@");
 		exit(0);
 	}
 
-	#my $command = "$humdrum2musicxml $humdrumname - | $cleanMusicxml > $xmlname";
-	my $command = "$humdrum2musicxml $humdrumname - | $cleanMusicxml ";
-print STDERR "COMMAND $command\n";
-	my $result = `$command`;
-	#open (XFILE, $xmlname);
-	#my @contents = <XFILE>;
-	#close XFILE;
-	#my $outputdata = join(@contents);
-	my $outputdata = $result;
-
-print STDERR "OUTPUT DATA IS GIVEN AS >>>$outputdata<<<\n";
+	print STDERR "OUTPUT DATA IS GIVEN AS >>>$outputdata<<<\n";
 
 	if ($outputdata =~ /^<\?mxl/) {
 		print "Content-Type: text/x-musicxml\n\n";
@@ -102,6 +108,44 @@ print STDERR "OUTPUT DATA IS GIVEN AS >>>$outputdata<<<\n";
 	} else {
 		errorMessage($outputdata);
 	}
+
+#	my ($inputdata) = @_;
+#
+#	my $humdrumname = "";
+#	if ($ENV{'CONTENT_LENGTH'} > $maxsize) {
+#		errorMessage("Input data is too large");
+#		return;
+#	} else {
+#		$humdrumname = cacheFile($inputdata);
+#	}
+#	if ($humdrumname =~ /^\s*$/) {
+#		errorMessage("Error processing data");
+#		exit(0);
+#	}
+#	my $xmlname = $humdrumname;
+#	$xmlname =~ s/\.[^.]+$/.xml/;
+#	if ($xmlname eq $humdrumname) {
+#		errorMessage("Strange problem with data");
+#		exit(0);
+#	}
+#
+#	my $command = "$humdrum2musicxml  | $cleanMusicxml ";
+#print STDERR "COMMAND $command\n";
+#	my $result = `$command`;
+#	#open (XFILE, $xmlname);
+#	#my @contents = <XFILE>;
+#	#close XFILE;
+#	#my $outputdata = join(@contents);
+#	my $outputdata = $result;
+#
+#print STDERR "OUTPUT DATA IS GIVEN AS >>>$outputdata<<<\n";
+#
+#	if ($outputdata =~ /^<\?mxl/) {
+#		print "Content-Type: text/x-musicxml\n\n";
+#		print "$outputdata";
+#	} else {
+#		errorMessage($outputdata);
+#	}
 }
 
 
@@ -147,6 +191,7 @@ sub printParameters {
 ##
 
 sub cacheFile {
+	return;
 	my ($contents, $datatype) = @_;
 	my ($year, $month, $day, $hour, $min, $sec) = getDate();
 	my $dir = "$cachedir/$year/$month/$day";
