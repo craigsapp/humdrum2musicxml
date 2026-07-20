@@ -17,6 +17,11 @@ CGIBIN = /var/www/cgi-bin
 
 help:
 	@echo all: install all programs into the cgi-bin directory
+        @echo config: install all Apache config into the cgi-bin directory
+
+config:
+        cp humdrum2musicxml.pl /etc/httpd/conf.d musicxml.humdrum.org.conf
+        apachectl restart
 
 all:
 	cp humdrum2musicxml.pl  $(CGIBIN)/humdrum2musicxml
