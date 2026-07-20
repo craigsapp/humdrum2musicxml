@@ -20,7 +20,7 @@ help:
 	@echo config: install all Apache config into the cgi-bin directory
 
 config:
-	cp humdrum2musicxml.pl /etc/httpd/conf.d/vhost-data.musicxml.humdrum.org-vpn.conf musicxml.humdrum.org.conf
+	cp vhost-data.musicxml.humdrum.org-vpn.conf /etc/httpd/conf.d/musicxml.humdrum.org.conf
 	apachectl restart
 
 all:
